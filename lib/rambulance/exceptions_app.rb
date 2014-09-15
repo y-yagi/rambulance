@@ -7,7 +7,27 @@ module Rambulance
     http_status >= 400 && ![418, 427, 430, 509].include?(http_status)
   end.invert
 
-  class ExceptionsApp < ActionController::Base
+  class ExceptionsApp < ::ActionController::Metal
+    EXCLUTED_MODULES = [
+      :Redirecting,
+      :ConditionalGet,
+      :StrongParameters,
+      :RequestForgeryProtection,
+      :ForceSSL,
+      :Streaming,
+      :DataStreaming,
+      ::ActionController::HttpAuthentication::Basic::ControllerMethods,
+      ::ActionController::HttpAuthentication::Digest::ControllerMethods,
+      ::ActionController::HttpAuthentication::Token::ControllerMethods,
+      :Instrumentation
+    ]
+
+    ::ActionController::Base.without_modules(*EXCLUTED_MODULES).each do |left|
+      include left
+    end
+
+    ActiveSupport.run_load_hooks(:action_controller, self)
+
     layout :layout_name
 
     def self.call(env)
@@ -25,7 +45,7 @@ module Rambulance
 
     def self.local_prefixes
       [Rambulance.view_path]
-    end if ActionPack::VERSION::STRING >= "4.2.0"
+    end if self.respond_to?(:local_prefixes)
 
     ERROR_HTTP_STATUSES.values.each do |status_in_words|
       eval <<-ACTION
